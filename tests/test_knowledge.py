@@ -113,11 +113,16 @@ async def test_delete_documents_removes_selected_blobs_and_reindexes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_search_deduplicates_documents_and_limits_excerpt() -> None:
+async def test_search_deduplicates_documents_and_preserves_search_chunk() -> None:
+    hotel_details = "London Hotels: The Buckingham Hotel, The City Hotel, The Kensington Hotel."
     search_client = AsyncMock()
     search_client.search.return_value = AsyncResults(
         [
-            {"document_id": "one", "title": "Guide", "content": "A " * 500},
+            {
+                "document_id": "one",
+                "title": "Guide",
+                "content": f"{'A ' * 400}{hotel_details}",
+            },
             {"document_id": "one", "title": "Guide", "content": "duplicate"},
             {"document_id": "two", "title": "FAQ", "content": "Short answer"},
         ]
@@ -128,7 +133,8 @@ async def test_search_deduplicates_documents_and_limits_excerpt() -> None:
 
     assert result["found"] is True
     assert [source["id"] for source in result["sources"]] == ["one", "two"]
-    assert len(result["sources"][0]["excerpt"]) <= 700
+    assert hotel_details in result["sources"][0]["excerpt"]
+    assert len(result["sources"][0]["excerpt"]) <= 2000
     assert "filter" not in search_client.search.call_args.kwargs
 
 

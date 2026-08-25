@@ -212,7 +212,7 @@ def validate_document(filename: str | None, content: bytes) -> str:
     return f"{stem or 'document'}{suffix}"
 
 
-def compact_excerpt(content: str, limit: int = 700) -> str:
+def compact_excerpt(content: str, limit: int = 2000) -> str:
     compact = " ".join(content.split())
     if len(compact) <= limit:
         return compact

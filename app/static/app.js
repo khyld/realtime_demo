@@ -141,9 +141,14 @@ async function startSession() {
   setConnection("connecting", "Forbinder");
   elements.activity.textContent = "Beder om mikrofonadgang";
   elements.start.disabled = true;
+  let startPhase = "microphone";
 
   try {
     elements.microphoneStatus.textContent = "Anmoder om mikrofonadgang...";
+
+    state.mediaStream = await navigator.mediaDevices.getUserMedia(getAudioConstraints());
+    elements.microphoneStatus.textContent = "Mikrofonen er forbundet og klar til samtalen.";
+    startPhase = "session";
 
     const sessionResponse = await fetch("/api/realtime/session", {
       method: "POST",
@@ -159,9 +164,7 @@ async function startSession() {
       elements.audio.srcObject = event.streams[0];
     });
 
-    state.mediaStream = await navigator.mediaDevices.getUserMedia(getAudioConstraints());
     state.mediaStream.getTracks().forEach((track) => state.peerConnection.addTrack(track, state.mediaStream));
-    elements.microphoneStatus.textContent = "Mikrofonen er forbundet og klar til samtalen.";
 
     state.dataChannel = state.peerConnection.createDataChannel("realtime-channel");
     state.dataChannel.addEventListener("open", () => {
@@ -174,6 +177,7 @@ async function startSession() {
     state.dataChannel.addEventListener("message", handleRealtimeEvent);
     state.dataChannel.addEventListener("close", () => logEvent("Data channel lukket"));
 
+    startPhase = "webrtc";
     const offer = await state.peerConnection.createOffer();
     await state.peerConnection.setLocalDescription(offer);
     const sdpResponse = await fetch(session.calls_url, {
@@ -190,9 +194,15 @@ async function startSession() {
       sdp: await sdpResponse.text(),
     });
   } catch (error) {
-    elements.microphoneStatus.textContent = "Mikrofonadgang blev nægtet eller kunne ikke startes. Kontrollér browser-tilladelser og prøv igen.";
     logEvent(error.message);
     stopSession(error.message, true);
+    if (startPhase === "microphone") {
+      elements.microphoneStatus.textContent = "Mikrofonadgang blev nægtet eller kunne ikke startes. Kontrollér browser-tilladelser og prøv igen.";
+    } else if (startPhase === "session") {
+      elements.microphoneStatus.textContent = "Mikrofonen virker, men realtime-sessionen kunne ikke startes. Prøv igen.";
+    } else {
+      elements.microphoneStatus.textContent = "Mikrofonen virker, men forbindelsen til realtime-tjenesten fejlede. Prøv igen.";
+    }
   }
 }
 

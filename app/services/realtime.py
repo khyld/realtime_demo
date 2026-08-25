@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal, Protocol
 
 import httpx
@@ -82,24 +83,52 @@ class RealtimeService:
                 "type": "realtime",
                 "model": self._settings.azure_openai_realtime_deployment,
                 "instructions": LANGUAGE_INSTRUCTIONS[language] + KNOWLEDGE_INSTRUCTIONS,
-                "audio": {"output": {"voice": self._settings.azure_openai_voice}},
+                "audio": {
+                    "input": {
+                        "transcription": {
+                            "model": self._settings.azure_openai_transcription_deployment
+                        },
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                            "interrupt_response": True,
+                        },
+                    },
+                    "output": {"voice": self._settings.azure_openai_voice},
+                },
                 "tools": [KNOWLEDGE_TOOL],
-                "tool_choice": "required",
+                "tool_choice": "auto",
             }
         }
 
-        try:
-            response = await self._client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {token.token}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise RealtimeSessionError("Azure Realtime session creation failed") from exc
+        response: httpx.Response | None = None
+        for attempt in range(3):
+            try:
+                response = await self._client.post(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {token.token}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                if response.status_code not in {429, 500, 502, 503, 504}:
+                    response.raise_for_status()
+                    break
+                if attempt == 2:
+                    response.raise_for_status()
+            except httpx.TransportError as exc:
+                if attempt == 2:
+                    raise RealtimeSessionError(
+                        "Azure Realtime session creation failed"
+                    ) from exc
+            except httpx.HTTPStatusError as exc:
+                raise RealtimeSessionError("Azure Realtime session creation failed") from exc
+
+            await asyncio.sleep(0.5 * (attempt + 1))
+
+        if response is None:
+            raise RealtimeSessionError("Azure Realtime session creation failed")
 
         data = response.json()
         ephemeral_token = data.get("value")
