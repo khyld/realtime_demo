@@ -14,6 +14,8 @@ param realtimeDeploymentName string = 'gpt-realtime-1.5'
 
 param embeddingDeploymentName string = 'text-embedding-3-large'
 
+param searchSku string = 'serverless'
+
 @secure()
 param entraClientSecret string = ''
 
@@ -75,22 +77,20 @@ resource knowledgeContainer 'Microsoft.Storage/storageAccounts/blobServices/cont
   }
 }
 
-resource search 'Microsoft.Search/searchServices@2025-05-01' = {
-  name: 'srch-${normalizedEnvironment}-${take(resourceToken, 6)}'
+resource search 'Microsoft.Search/searchServices@2026-03-01-preview' = {
+  name: 'srch-${normalizedEnvironment}-sl-${take(resourceToken, 6)}'
   location: location
   tags: tags
   identity: {
     type: 'SystemAssigned'
   }
   sku: {
-    name: 'basic'
+    name: searchSku
   }
   properties: {
     disableLocalAuth: true
     hostingMode: 'Default'
-    partitionCount: 1
     publicNetworkAccess: 'enabled'
-    replicaCount: 1
     semanticSearch: 'free'
   }
 }
@@ -299,6 +299,7 @@ var openAiUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefin
 var openAiContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a001fd3d-188f-4b5d-821b-7da978bf7442')
 var storageBlobContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 var storageBlobReaderRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')
+var cognitiveServicesUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
 var searchDataReaderRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1407120a-92aa-4202-b7e9-c0e197c71c8f')
 var searchServiceContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7ca78c08-252a-4471-8644-bb5ff32d4ba0')
 
@@ -329,6 +330,16 @@ resource searchFoundryContributor 'Microsoft.Authorization/roleAssignments@2022-
     principalId: search.identity.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: openAiContributorRoleId
+  }
+}
+
+resource searchFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, search.id, cognitiveServicesUserRoleId)
+  scope: foundry
+  properties: {
+    principalId: search.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: cognitiveServicesUserRoleId
   }
 }
 
@@ -387,6 +398,7 @@ output AZURE_OPENAI_RESOURCE string = existingFoundryResourceName
 output AZURE_OPENAI_REALTIME_DEPLOYMENT string = realtimeDeploymentName
 output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingDeploymentName
 output AZURE_OPENAI_ENDPOINT string = 'https://${existingFoundryResourceName}.openai.azure.com'
+output AZURE_AI_SERVICES_ENDPOINT string = 'https://${existingFoundryResourceName}.cognitiveservices.azure.com'
 output AZURE_SEARCH_ENDPOINT string = 'https://${search.name}.search.windows.net'
 output AZURE_SEARCH_INDEX_NAME string = 'knowledge-chunks'
 output AZURE_SEARCH_INDEXER_NAME string = 'knowledge-indexer'

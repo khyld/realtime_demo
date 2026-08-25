@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from uuid import uuid4
 
 import httpx
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
 from azure.identity.aio import DefaultAzureCredential
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.indexes.aio import SearchIndexerClient
@@ -35,6 +36,10 @@ class SessionResponse(BaseModel):
 class KnowledgeSearchRequest(BaseModel):
     query: str = Field(min_length=2, max_length=500)
     language: Literal["auto", "da", "en"] = "auto"
+
+
+class DeleteKnowledgeDocumentsRequest(BaseModel):
+    document_ids: list[str] = Field(default_factory=list)
 
 
 async def get_realtime_service(
@@ -116,8 +121,16 @@ async def create_realtime_session(
     return await service.create_client_secret(body.language)
 
 
+@app.get("/api/knowledge/documents")
+async def list_knowledge_documents(
+    service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+) -> dict[str, object]:
+    return await service.list_documents()
+
+
 @app.post("/api/knowledge/documents", status_code=202)
 async def upload_knowledge_documents(
+    request: Request,
     service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
     files: Annotated[list[UploadFile], File(alias="file")],
 ) -> dict[str, object]:
@@ -129,6 +142,33 @@ async def upload_knowledge_documents(
         return await service.upload_documents(documents)
     except DocumentValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (ClientAuthenticationError, HttpResponseError) as exc:
+        logger.warning(
+            "Knowledge-base upload failed while accessing Blob Storage",
+            extra={"correlation_id": request.state.correlation_id, "error": str(exc)},
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Upload kunne ikke godkendes mod Blob Storage. "
+                "Kontrollér Azure-login og rollen Storage Blob Data Contributor."
+            ),
+        ) from exc
+
+
+@app.get("/api/knowledge/indexing-status")
+async def knowledge_indexing_status(
+    service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+) -> dict[str, object]:
+    return await service.get_indexing_status()
+
+
+@app.delete("/api/knowledge/documents")
+async def delete_knowledge_documents(
+    body: DeleteKnowledgeDocumentsRequest,
+    service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+) -> dict[str, object]:
+    return await service.delete_documents(body.document_ids)
 
 
 @app.post("/api/knowledge/search")

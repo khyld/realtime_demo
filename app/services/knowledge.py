@@ -12,10 +12,12 @@ ALLOWED_EXTENSIONS = {".docx", ".pdf", ".txt"}
 
 class BlobClientProtocol(Protocol):
     async def upload_blob(self, data: bytes, *, overwrite: bool, content_settings: Any) -> Any: ...
+    async def delete_blob(self, *, delete_snapshots: str = "include") -> Any: ...
 
 
 class ContainerClientProtocol(Protocol):
     def get_blob_client(self, blob: str) -> BlobClientProtocol: ...
+    def list_blobs(self) -> Any: ...
 
 
 class SearchClientProtocol(Protocol):
@@ -24,6 +26,7 @@ class SearchClientProtocol(Protocol):
 
 class IndexerClientProtocol(Protocol):
     async def run_indexer(self, name: str) -> None: ...
+    async def get_indexer_status(self, name: str) -> Any: ...
 
 
 class DocumentValidationError(ValueError):
@@ -90,6 +93,64 @@ class KnowledgeService:
             "documents": uploaded_documents,
             "count": len(uploaded_documents),
             "status": "indexing",
+        }
+
+    async def list_documents(self) -> dict[str, Any]:
+        documents: list[dict[str, str]] = []
+        async for blob in self._container_client.list_blobs():
+            blob_name = str(getattr(blob, "name", blob))
+            if not blob_name:
+                continue
+            if "/" in blob_name:
+                document_id, filename = blob_name.split("/", 1)
+            else:
+                document_id, filename = blob_name, blob_name
+            documents.append({"document_id": document_id, "filename": filename})
+
+        unique_documents: dict[str, str] = {}
+        for document in documents:
+            unique_documents.setdefault(document["document_id"], document["filename"])
+
+        ordered = [
+            {"document_id": document_id, "filename": filename}
+            for document_id, filename in unique_documents.items()
+        ]
+        ordered.sort(key=lambda item: item["filename"].lower())
+        return {"documents": ordered, "count": len(ordered)}
+
+    async def delete_documents(self, document_ids: list[str]) -> dict[str, Any]:
+        unique_ids = list(dict.fromkeys(document_ids or []))
+        if not unique_ids:
+            return {"deleted_count": 0, "deleted": [], "status": "nothing-to-delete"}
+
+        deleted: list[str] = []
+        async for blob in self._container_client.list_blobs():
+            blob_name = str(getattr(blob, "name", blob))
+            if not blob_name:
+                continue
+            document_id = blob_name.split("/", 1)[0]
+            if document_id not in unique_ids:
+                continue
+            blob_client = self._container_client.get_blob_client(blob_name)
+            await blob_client.delete_blob(delete_snapshots="include")
+            deleted.append(blob_name)
+
+        await self._indexer_client.run_indexer(self._indexer_name)
+        return {
+            "deleted": deleted,
+            "deleted_count": len(deleted),
+            "status": "deleted" if deleted else "not-found",
+        }
+
+    async def get_indexing_status(self) -> dict[str, Any]:
+        status = await self._indexer_client.get_indexer_status(self._indexer_name)
+        last_result = getattr(status, "last_result", None)
+        return {
+            "status": getattr(status, "status", "unknown"),
+            "last_result_status": getattr(last_result, "status", None),
+            "items_processed": getattr(last_result, "items_processed", None),
+            "items_failed": getattr(last_result, "items_failed", None),
+            "error_message": getattr(last_result, "error_message", None),
         }
 
     async def search(self, query: str, language: str, top: int = 5) -> dict[str, Any]:

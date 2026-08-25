@@ -42,6 +42,25 @@
         </div>
       </div>
 
+      <div class="microphone-picker">
+        <label for="microphoneSelect">Mikrofon</label>
+        <select id="microphoneSelect" aria-label="Vælg mikrofon">
+          <option value="">Henter mikrofoner...</option>
+        </select>
+      </div>
+      <p id="microphoneStatus" class="microphone-status" aria-live="polite">Venter på adgang til mikrofonen.</p>
+
+      <div class="question-box">
+        <label for="questionInput">Spørgsmål</label>
+        <div class="question-input-row">
+          <textarea id="questionInput" rows="2" placeholder="Skriv et spørgsmål her..."></textarea>
+          <button id="sendQuestionButton" type="button" class="secondary-button" disabled>
+            <i data-lucide="send" aria-hidden="true"></i>
+            Send
+          </button>
+        </div>
+      </div>
+
       <div class="session-controls">
         <button id="startButton" type="button" class="primary-button">
           <i data-lucide="mic" aria-hidden="true"></i>
@@ -50,6 +69,10 @@
         <button id="stopButton" type="button" class="secondary-button" disabled>
           <i data-lucide="square" aria-hidden="true"></i>
           Stop
+        </button>
+        <button id="clearTranscriptButton" type="button" class="secondary-button" title="Ryd samtale">
+          <i data-lucide="trash-2" aria-hidden="true"></i>
+          Ryd
         </button>
         <span id="activityText" class="activity-text">Klar</span>
       </div>
@@ -78,6 +101,22 @@
           </button>
           <p id="uploadStatus" class="inline-status" aria-live="polite"></p>
         </form>
+
+        <div class="document-manager" aria-live="polite">
+          <div class="document-manager-header">
+            <h3>Dokumenter</h3>
+            <button id="refreshDocumentsButton" type="button" class="ghost-button" title="Opdater dokumentliste">
+              <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div id="knowledgeDocumentList" class="knowledge-document-list">
+            <p class="muted">Indlæser dokumenter...</p>
+          </div>
+          <button id="deleteDocumentsButton" type="button" class="danger-button" disabled>
+            <i data-lucide="trash-2" aria-hidden="true"></i>
+            Slet valgte
+          </button>
+        </div>
       </section>
 
       <section class="sources-section" aria-labelledby="sourcesTitle">

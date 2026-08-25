@@ -29,9 +29,9 @@ async def test_create_client_secret_uses_ga_endpoint_and_entra_token() -> None:
     assert captured_request.headers["authorization"] == "Bearer entra-token"
     payload = json.loads(captured_request.content)
     session = payload["session"]
-    assert "MUST call this tool" in session["instructions"]
+    assert "For EVERY user question, you MUST call" in session["instructions"]
     assert session["tools"][0]["name"] == "search_knowledge_base"
-    assert session["tool_choice"] == "auto"
+    assert session["tool_choice"] == "required"
     assert result["token"] == "ephemeral"
     assert result["calls_url"].endswith("/openai/v1/realtime/calls")
 

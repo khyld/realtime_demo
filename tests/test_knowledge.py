@@ -24,6 +24,20 @@ class AsyncResults:
             raise StopAsyncIteration from exc
 
 
+class AsyncBlobs:
+    def __init__(self, items: list[Mock]) -> None:
+        self._items = iter(items)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._items)
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
+
+
 def test_validate_document_sanitizes_filename() -> None:
     assert validate_document("../Møde referat?.PDF", b"content") == "M_de referat.pdf"
 
@@ -54,6 +68,47 @@ async def test_upload_documents_starts_indexer_once_for_batch() -> None:
         "notes.txt",
     ]
     assert blob_client.upload_blob.await_count == 2
+    indexer_client.run_indexer.assert_awaited_once_with("indexer")
+
+
+@pytest.mark.asyncio
+async def test_list_documents_returns_names_and_ids() -> None:
+    alpha = Mock()
+    alpha.name = "alpha/guide.pdf"
+    beta = Mock()
+    beta.name = "beta/notes.txt"
+    container_client = Mock()
+    container_client.list_blobs.return_value = AsyncBlobs([alpha, beta])
+    service = KnowledgeService(container_client, AsyncMock(), AsyncMock(), "indexer")
+
+    result = await service.list_documents()
+
+    assert result["count"] == 2
+    assert result["documents"] == [
+        {"document_id": "alpha", "filename": "guide.pdf"},
+        {"document_id": "beta", "filename": "notes.txt"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_documents_removes_selected_blobs_and_reindexes() -> None:
+    blob_client_one = Mock(delete_blob=AsyncMock())
+    blob_client_two = Mock(delete_blob=AsyncMock())
+    blob_one = Mock()
+    blob_one.name = "alpha/guide.pdf"
+    blob_two = Mock()
+    blob_two.name = "beta/notes.txt"
+    container_client = Mock()
+    container_client.get_blob_client.side_effect = [blob_client_one, blob_client_two]
+    container_client.list_blobs.return_value = AsyncBlobs([blob_one, blob_two])
+    indexer_client = AsyncMock()
+    service = KnowledgeService(container_client, AsyncMock(), indexer_client, "indexer")
+
+    result = await service.delete_documents(["alpha", "beta"])
+
+    assert result["deleted_count"] == 2
+    assert blob_client_one.delete_blob.await_count == 1
+    assert blob_client_two.delete_blob.await_count == 1
     indexer_client.run_indexer.assert_awaited_once_with("indexer")
 
 

@@ -30,21 +30,19 @@ LANGUAGE_INSTRUCTIONS: dict[Language, str] = {
 }
 
 KNOWLEDGE_INSTRUCTIONS = (
-    " A knowledge base of the user's uploaded documents is available through "
-    "search_knowledge_base. You MUST call this tool before answering any question that refers "
-    "to the knowledge base, uploaded documents, or facts that could be specific to the user's "
-    "organization, project, or documents. Never answer such a question from general knowledge "
-    "or assumptions. After the tool returns, answer only from its sources and mention each used "
-    "source title. If no sources are found, say that the knowledge base does not contain enough "
-    "information. Do not call the tool for casual conversation or general knowledge questions."
+    " You are a knowledge-base-only assistant. For EVERY user question, you MUST call "
+    "search_knowledge_base before answering. Use only facts supported by the returned sources; "
+    "do not use general knowledge, assumptions, or information from the conversation as evidence. "
+    "Mention each source title used in the answer. If no sources are found, say that the knowledge "
+    "base does not contain enough information and do not attempt an answer."
 )
 
 KNOWLEDGE_TOOL = {
     "type": "function",
     "name": "search_knowledge_base",
     "description": (
-        "Search the user's uploaded documents. This tool is required before answering questions "
-        "about the knowledge base, uploaded files, or user-specific organizational/project facts."
+        "Search the user's uploaded documents. This tool is required before answering every user "
+        "question because answers must be based only on the knowledge base."
     ),
     "parameters": {
         "type": "object",
@@ -86,7 +84,7 @@ class RealtimeService:
                 "instructions": LANGUAGE_INSTRUCTIONS[language] + KNOWLEDGE_INSTRUCTIONS,
                 "audio": {"output": {"voice": self._settings.azure_openai_voice}},
                 "tools": [KNOWLEDGE_TOOL],
-                "tool_choice": "auto",
+                "tool_choice": "required",
             }
         }
 

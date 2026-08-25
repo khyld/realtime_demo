@@ -2,8 +2,16 @@ const elements = {
   activity: document.querySelector("#activityText"),
   audio: document.querySelector("#remoteAudio"),
   connection: document.querySelector("#connectionStatus"),
+  clearTranscriptButton: document.querySelector("#clearTranscriptButton"),
   documentInput: document.querySelector("#documentInput"),
+  deleteDocumentsButton: document.querySelector("#deleteDocumentsButton"),
   eventLog: document.querySelector("#eventLog"),
+  knowledgeDocumentList: document.querySelector("#knowledgeDocumentList"),
+  microphoneSelect: document.querySelector("#microphoneSelect"),
+  microphoneStatus: document.querySelector("#microphoneStatus"),
+  questionInput: document.querySelector("#questionInput"),
+  refreshDocumentsButton: document.querySelector("#refreshDocumentsButton"),
+  sendQuestionButton: document.querySelector("#sendQuestionButton"),
   sourceCount: document.querySelector("#sourceCount"),
   sourceList: document.querySelector("#sourceList"),
   start: document.querySelector("#startButton"),
@@ -20,16 +28,34 @@ const state = {
   language: "auto",
   mediaStream: null,
   peerConnection: null,
+  selectedMicrophoneId: "",
+  selectedDocumentIds: new Set(),
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   window.lucide?.createIcons();
   bindEvents();
+  await Promise.all([loadMicrophoneDevices(), loadKnowledgeDocuments(), loadIndexingStatus()]);
 });
 
 function bindEvents() {
   elements.start.addEventListener("click", startSession);
   elements.stop.addEventListener("click", () => stopSession("Session stoppet"));
+  elements.clearTranscriptButton.addEventListener("click", clearTranscript);
+  elements.microphoneSelect.addEventListener("change", () => {
+    state.selectedMicrophoneId = elements.microphoneSelect.value;
+    elements.microphoneStatus.textContent = `Valgt mikrofon: ${elements.microphoneSelect.options[elements.microphoneSelect.selectedIndex]?.text || "standard"}`;
+    logEvent(`Mikrofon valgt: ${elements.microphoneSelect.options[elements.microphoneSelect.selectedIndex]?.text || "standard"}`);
+  });
+  elements.sendQuestionButton.addEventListener("click", sendTypedQuestion);
+  elements.refreshDocumentsButton.addEventListener("click", loadKnowledgeDocuments);
+  elements.deleteDocumentsButton.addEventListener("click", deleteSelectedDocuments);
+  elements.questionInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendTypedQuestion();
+    }
+  });
   elements.documentInput.addEventListener("change", () => {
     const files = Array.from(elements.documentInput.files);
     elements.uploadButton.disabled = files.length === 0 || files.length > 10;
@@ -46,6 +72,68 @@ function bindEvents() {
   window.addEventListener("beforeunload", cleanupSession);
 }
 
+async function loadMicrophoneDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    elements.microphoneSelect.disabled = false;
+    elements.microphoneSelect.innerHTML = '<option value="">Standardmikrofon</option>';
+    elements.microphoneStatus.textContent = "Browseren vælger standardmikrofonen.";
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const microphones = devices.filter((device) => device.kind === "audioinput");
+    elements.microphoneSelect.innerHTML = "";
+
+    if (!microphones.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "Standardmikrofon";
+      elements.microphoneSelect.append(option);
+      elements.microphoneSelect.disabled = false;
+      elements.microphoneStatus.textContent = "Vælg standardmikrofonen, eller giv browseren mikrofontilladelse.";
+      return;
+    }
+
+    microphones.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Mikrofon ${index + 1}`;
+      elements.microphoneSelect.append(option);
+    });
+
+    if (state.selectedMicrophoneId) {
+      elements.microphoneSelect.value = state.selectedMicrophoneId;
+    } else {
+      state.selectedMicrophoneId = microphones[0].deviceId;
+      elements.microphoneSelect.value = state.selectedMicrophoneId;
+    }
+
+    elements.microphoneSelect.disabled = false;
+    elements.microphoneStatus.textContent = "Mikrofonen er klar til brug.";
+  } catch (error) {
+    logEvent(`Mikrofonliste kunne ikke hentes: ${error.message}`);
+    elements.microphoneSelect.disabled = false;
+    elements.microphoneSelect.innerHTML = '<option value="">Standardmikrofon</option>';
+    elements.microphoneStatus.textContent = "Mikrofonlisten kunne ikke hentes; standardmikrofonen bruges ved start.";
+  }
+}
+
+function getAudioConstraints() {
+  if (!state.selectedMicrophoneId) {
+    return { audio: true };
+  }
+
+  return {
+    audio: {
+      deviceId: { exact: state.selectedMicrophoneId },
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  };
+}
+
 async function startSession() {
   if (state.peerConnection) return;
   setConnection("connecting", "Forbinder");
@@ -53,6 +141,8 @@ async function startSession() {
   elements.start.disabled = true;
 
   try {
+    elements.microphoneStatus.textContent = "Anmoder om mikrofonadgang...";
+
     const sessionResponse = await fetch("/api/realtime/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,14 +157,17 @@ async function startSession() {
       elements.audio.srcObject = event.streams[0];
     });
 
-    state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.mediaStream = await navigator.mediaDevices.getUserMedia(getAudioConstraints());
     state.mediaStream.getTracks().forEach((track) => state.peerConnection.addTrack(track, state.mediaStream));
+    elements.microphoneStatus.textContent = "Mikrofonen er forbundet og klar til samtalen.";
 
     state.dataChannel = state.peerConnection.createDataChannel("realtime-channel");
     state.dataChannel.addEventListener("open", () => {
       setConnection("connected", "Forbundet");
       elements.activity.textContent = "Lytter";
       elements.stop.disabled = false;
+      elements.questionInput.disabled = false;
+      elements.sendQuestionButton.disabled = false;
       logEvent("Data channel åbnet");
     });
     state.dataChannel.addEventListener("message", handleRealtimeEvent);
@@ -96,6 +189,7 @@ async function startSession() {
       sdp: await sdpResponse.text(),
     });
   } catch (error) {
+    elements.microphoneStatus.textContent = "Mikrofonadgang blev nægtet eller kunne ikke startes. Kontrollér browser-tilladelser og prøv igen.";
     logEvent(error.message);
     stopSession(error.message, true);
   }
@@ -180,6 +274,29 @@ function sendRealtimeEvent(event) {
   }
 }
 
+function sendTypedQuestion() {
+  const question = elements.questionInput.value.trim();
+  if (!question) return;
+  if (!state.dataChannel || state.dataChannel.readyState !== "open") {
+    elements.microphoneStatus.textContent = "Start samtalen først, før du sender et tekstspørgsmål.";
+    return;
+  }
+
+  appendTurn("user", question);
+  sendRealtimeEvent({
+    type: "conversation.item.create",
+    item: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: question }],
+    },
+  });
+  sendRealtimeEvent({ type: "response.create" });
+  elements.questionInput.value = "";
+  elements.questionInput.focus();
+  logEvent("Tekstspørgsmål sendt til realtime-sessionen");
+}
+
 async function uploadDocument(event) {
   event.preventDefault();
   const files = Array.from(elements.documentInput.files);
@@ -194,9 +311,90 @@ async function uploadDocument(event) {
     const result = await response.json();
     elements.uploadStatus.textContent = `${result.count} ${result.count === 1 ? "dokument" : "dokumenter"} modtaget. Indeksering er startet.`;
     elements.uploadForm.reset();
+    await loadKnowledgeDocuments();
+    await loadIndexingStatus();
   } catch (error) {
     elements.uploadStatus.textContent = error.message;
     elements.uploadButton.disabled = false;
+  }
+}
+
+async function loadKnowledgeDocuments() {
+  try {
+    const response = await fetch("/api/knowledge/documents");
+    if (!response.ok) throw new Error(await responseMessage(response));
+    const result = await response.json();
+    renderKnowledgeDocuments(result.documents || []);
+  } catch (error) {
+    elements.knowledgeDocumentList.replaceChildren();
+    const message = document.createElement("p");
+    message.className = "document-empty-state";
+    message.textContent = `Kunne ikke hente dokumenter: ${error.message}`;
+    elements.knowledgeDocumentList.append(message);
+    elements.deleteDocumentsButton.disabled = true;
+  }
+}
+
+function renderKnowledgeDocuments(documents) {
+  elements.knowledgeDocumentList.replaceChildren();
+  if (!documents.length) {
+    const empty = document.createElement("p");
+    empty.className = "document-empty-state";
+    empty.textContent = "Ingen dokumenter i knowledge base endnu.";
+    elements.knowledgeDocumentList.append(empty);
+    elements.deleteDocumentsButton.disabled = true;
+    return;
+  }
+
+  documents.forEach((documentItem) => {
+    const item = document.createElement("label");
+    item.className = "knowledge-document-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = documentItem.document_id;
+    checkbox.checked = state.selectedDocumentIds.has(documentItem.document_id);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        state.selectedDocumentIds.add(documentItem.document_id);
+      } else {
+        state.selectedDocumentIds.delete(documentItem.document_id);
+      }
+      updateDocumentSelectionState();
+    });
+
+    const label = document.createElement("span");
+    label.textContent = documentItem.filename;
+
+    item.append(checkbox, label);
+    elements.knowledgeDocumentList.append(item);
+  });
+
+  updateDocumentSelectionState();
+}
+
+function updateDocumentSelectionState() {
+  elements.deleteDocumentsButton.disabled = state.selectedDocumentIds.size === 0;
+}
+
+async function deleteSelectedDocuments() {
+  const documentIds = Array.from(state.selectedDocumentIds);
+  if (!documentIds.length) return;
+
+  try {
+    const response = await fetch("/api/knowledge/documents", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_ids: documentIds }),
+    });
+    if (!response.ok) throw new Error(await responseMessage(response));
+    const result = await response.json();
+    state.selectedDocumentIds.clear();
+    elements.uploadStatus.textContent = `${result.deleted_count} dokument${result.deleted_count === 1 ? "" : "er"} slettet.`;
+    await loadKnowledgeDocuments();
+    await loadIndexingStatus();
+  } catch (error) {
+    elements.uploadStatus.textContent = error.message;
   }
 }
 
@@ -205,6 +403,16 @@ function selectedFilesMessage(files) {
   if (files.length > 10) return "Vælg højst 10 filer ad gangen.";
   if (files.length === 1) return files[0].name;
   return `${files.length} filer valgt`;
+}
+
+function clearTranscript() {
+  elements.transcript.replaceChildren();
+  const emptyState = document.createElement("div");
+  emptyState.className = "empty-state";
+  emptyState.innerHTML = '<i data-lucide="audio-lines" aria-hidden="true"></i><p>Start mikrofonen og tal naturligt på dansk eller engelsk.</p>';
+  elements.transcript.append(emptyState);
+  window.lucide?.createIcons();
+  logEvent("Samtaleindhold ryddet");
 }
 
 function appendTurn(role, text) {
@@ -252,6 +460,10 @@ function stopSession(message = "Ikke forbundet", isError = false) {
   elements.activity.textContent = "Klar";
   elements.start.disabled = false;
   elements.stop.disabled = true;
+  elements.sendQuestionButton.disabled = true;
+  if (!state.peerConnection && !state.mediaStream) {
+    elements.microphoneStatus.textContent = "Venter på adgang til mikrofonen.";
+  }
 }
 
 function cleanupSession() {
@@ -282,5 +494,28 @@ async function responseMessage(response) {
     return body.detail || body.error || `Request fejlede (${response.status})`;
   } catch {
     return `Request fejlede (${response.status})`;
+  }
+}
+
+async function loadIndexingStatus() {
+  try {
+    const response = await fetch("/api/knowledge/indexing-status");
+    if (!response.ok) throw new Error(await responseMessage(response));
+    const result = await response.json();
+    renderIndexingStatus(result);
+  } catch (error) {
+    elements.uploadStatus.textContent = `Indekseringsstatus kunne ikke hentes: ${error.message}`;
+  }
+}
+
+function renderIndexingStatus(result) {
+  const status = result.last_result_status || result.status;
+  if (status === "inProgress" || status === "running") {
+    elements.uploadStatus.textContent = "Indekserer dokumenter...";
+    window.setTimeout(loadIndexingStatus, 5000);
+  } else if (status === "success") {
+    elements.uploadStatus.textContent = "Indeksering er færdig.";
+  } else if (status === "transientFailure" || status === "persistentFailure" || status === "error") {
+    elements.uploadStatus.textContent = `Indeksering fejlede: ${result.error_message || "ukendt fejl"}`;
   }
 }

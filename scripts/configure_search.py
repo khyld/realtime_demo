@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 from azure.identity import DefaultAzureCredential
 
-API_VERSION = "2025-09-01"
+API_VERSION = "2026-04-01"
 SEARCH_SCOPE = "https://search.azure.com/.default"
 
 
@@ -42,6 +42,7 @@ def main() -> None:
     storage_resource_id = required("AZURE_STORAGE_ACCOUNT_ID")
     container_name = required("AZURE_STORAGE_CONTAINER_NAME")
     openai_endpoint = required("AZURE_OPENAI_ENDPOINT")
+    ai_services_endpoint = required("AZURE_AI_SERVICES_ENDPOINT")
     embedding_deployment = required("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")
     index_name = required("AZURE_SEARCH_INDEX_NAME")
     indexer_name = required("AZURE_SEARCH_INDEXER_NAME")
@@ -153,6 +154,10 @@ def main() -> None:
                 "outputs": [{"name": "embedding", "targetName": "embedding"}],
             },
         ],
+        "cognitiveServices": {
+            "@odata.type": "#Microsoft.Azure.Search.AIServicesByIdentity",
+            "subdomainUrl": ai_services_endpoint,
+        },
         "indexProjections": {
             "selectors": [
                 {

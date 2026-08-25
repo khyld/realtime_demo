@@ -105,6 +105,72 @@ main {
 .turn-text { display: inline-block; margin: 0; padding: 11px 14px; border: 1px solid var(--line); background: white; line-height: 1.5; text-align: left; }
 .assistant .turn-text { border-color: #b6d3c8; background: #eaf4ef; }
 
+.microphone-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: #f7f4ee;
+}
+
+.microphone-picker label {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.microphone-picker select {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+}
+
+.microphone-status {
+  margin: -8px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 18px;
+}
+
+.question-box {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: #f9f7f3;
+}
+
+.question-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.question-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+#questionInput {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+
+#sendQuestionButton {
+  align-self: end;
+}
+
 .session-controls { min-height: 44px; display: flex; align-items: center; gap: 10px; }
 .primary-button, .secondary-button {
   min-height: 42px;
@@ -115,6 +181,13 @@ main {
   padding: 9px 15px;
   border: 1px solid var(--forest);
   font-weight: 650;
+}
+#clearTranscriptButton {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+#clearTranscriptButton:hover:not(:disabled) {
+  background: #fff0ec;
 }
 .primary-button { color: white; background: var(--forest); }
 .primary-button:hover { background: var(--forest-dark); }
@@ -131,6 +204,87 @@ main {
 .file-drop small { margin-top: 4px; color: var(--muted); }
 .upload-form .wide { margin-top: 10px; }
 .inline-status { min-height: 20px; margin: 9px 0 0; color: var(--muted); font-size: 12px; }
+
+.document-manager {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.document-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.document-manager-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.ghost-button,
+.danger-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+
+.danger-button {
+  width: 100%;
+  margin-top: 12px;
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.ghost-button:hover:not(:disabled),
+.danger-button:hover:not(:disabled) {
+  background: #f7f3ed;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #fff0ec;
+}
+
+.knowledge-document-list {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.knowledge-document-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: #fdfbf7;
+}
+
+.knowledge-document-item input {
+  accent-color: var(--forest);
+}
+
+.knowledge-document-item span {
+  overflow-wrap: anywhere;
+}
+
+.document-empty-state {
+  padding: 12px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  background: #faf8f2;
+}
 
 .count { min-width: 28px; padding: 4px 8px; background: var(--signal-soft); color: #873519; text-align: center; font: 700 12px "Cascadia Code", monospace; }
 .source-list { margin: 18px 0 0; padding-left: 22px; }
