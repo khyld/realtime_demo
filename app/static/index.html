@@ -7,7 +7,7 @@
   <title>Realtime Sproglab</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v=3" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -53,7 +53,7 @@
       <div class="question-box">
         <label for="questionInput">Spørgsmål</label>
         <div class="question-input-row">
-          <textarea id="questionInput" rows="2" placeholder="Skriv et spørgsmål her..."></textarea>
+          <textarea id="questionInput" rows="2" placeholder="Skriv et spørgsmål her..." aria-label="Skriv et spørgsmål"></textarea>
           <button id="sendQuestionButton" type="button" class="secondary-button" disabled>
             <i data-lucide="send" aria-hidden="true"></i>
             Send

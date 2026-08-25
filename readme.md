@@ -4,6 +4,46 @@ Et lille læringsprojekt til at teste `gpt-realtime-1.5` med dansk og engelsk ta
 
 ## Arkitektur
 
+```mermaid
+flowchart LR
+	user[Bruger] --> browser[Browserklient]
+
+	subgraph app[Azure Container Apps]
+		static[Statisk webklient]
+		api[FastAPI]
+	end
+
+	subgraph foundry[Microsoft Foundry]
+		realtime[gpt-realtime-1.5]
+		embeddings[text-embedding-3-large]
+	end
+
+	subgraph knowledge[Knowledge base]
+		blob[(Blob Storage)]
+		indexer[AI Search-indexer]
+		index[(Hybridt semantisk og vektorindeks)]
+	end
+
+	browser -- HTTPS --> static
+	browser -- Opret session --> api
+	api -- Kortlivet client secret --> realtime
+	browser <-- WebRTC: lyd og events --> realtime
+
+	realtime -- search_knowledge_base --> browser
+	browser -- Knowledge-søgning --> api
+	api -- Hybrid søgning --> index
+	index -- Grounded kilder --> api
+	api -- Tool-resultat --> browser
+	browser -- Function-call-output --> realtime
+
+	browser -- Upload dokumenter --> api
+	api -- PDF, DOCX og TXT --> blob
+	api -- Start indeksering --> indexer
+	blob --> indexer
+	indexer -- Chunking og sprogdetektion --> embeddings
+	embeddings -- 3072-dimensionelle vektorer --> index
+```
+
 - Browseren forbinder direkte til GPT Realtime med WebRTC og en kortlivet client secret fra FastAPI.
 - FastAPI bruger `DefaultAzureCredential`; ingen Azure API-nøgler ligger i kildekoden.
 - Dokumenter gemmes i Blob Storage og chunkes/vektoriseres af Azure AI Search.

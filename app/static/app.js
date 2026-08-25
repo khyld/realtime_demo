@@ -28,12 +28,14 @@ const state = {
   language: "auto",
   mediaStream: null,
   peerConnection: null,
+  pendingAssistantText: "",
   selectedMicrophoneId: "",
   selectedDocumentIds: new Set(),
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
   window.lucide?.createIcons();
+  elements.questionInput.disabled = false;
   bindEvents();
   await Promise.all([loadMicrophoneDevices(), loadKnowledgeDocuments(), loadIndexingStatus()]);
 });
@@ -166,7 +168,6 @@ async function startSession() {
       setConnection("connected", "Forbundet");
       elements.activity.textContent = "Lytter";
       elements.stop.disabled = false;
-      elements.questionInput.disabled = false;
       elements.sendQuestionButton.disabled = false;
       logEvent("Data channel åbnet");
     });
@@ -223,8 +224,21 @@ async function handleRealtimeEvent(message) {
     elements.activity.textContent = "Lytter";
   } else if (event.type === "conversation.item.input_audio_transcription.completed") {
     appendTurn("user", event.transcript);
+  } else if (event.type === "response.output_text.delta") {
+    state.pendingAssistantText += event.delta || "";
+    elements.activity.textContent = "Assistenten svarer";
+  } else if (event.type === "response.output_text.done") {
+    if (state.pendingAssistantText) {
+      appendTurn("assistant", state.pendingAssistantText);
+      state.pendingAssistantText = "";
+    }
   } else if (event.type === "response.output_audio_transcript.done") {
     appendTurn("assistant", event.transcript);
+  } else if (event.type === "response.done") {
+    if (event.response?.status === "failed") {
+      logEvent(event.response.status_details?.error?.message || "Realtime-svaret fejlede");
+    }
+    elements.activity.textContent = "Lytter";
   } else if (event.type === "response.function_call_arguments.done") {
     await executeKnowledgeTool(event);
   } else if (event.type === "error") {
@@ -283,6 +297,7 @@ function sendTypedQuestion() {
   }
 
   appendTurn("user", question);
+  elements.activity.textContent = "Tænker";
   sendRealtimeEvent({
     type: "conversation.item.create",
     item: {
