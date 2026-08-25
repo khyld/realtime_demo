@@ -1,15 +1,17 @@
-# GPT Realtime Sproglab
+# GPT Realtime Language Lab
 
-Et lille læringsprojekt til at teste `gpt-realtime-1.5` med dansk og engelsk tale samt grounded svar fra egne PDF-, DOCX- og TXT-filer.
+[Dansk version](readme_dk.md)
 
-## Arkitektur
+A small learning project for testing `gpt-realtime-1.5` with Danish and English speech and grounded answers from your own PDF, DOCX, and TXT files.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-	user[Bruger] --> browser[Browserklient]
+	user[User] --> browser[Browser client]
 
 	subgraph app[Azure Container Apps]
-		static[Statisk webklient]
+		static[Static web client]
 		api[FastAPI]
 	end
 
@@ -20,45 +22,45 @@ flowchart LR
 
 	subgraph knowledge[Knowledge base]
 		blob[(Blob Storage)]
-		indexer[AI Search-indexer]
-		index[(Hybridt semantisk og vektorindeks)]
+		indexer[AI Search indexer]
+		index[(Hybrid semantic and vector index)]
 	end
 
 	browser -- HTTPS --> static
-	browser -- Opret session --> api
-	api -- Kortlivet client secret --> realtime
-	browser <-- WebRTC: lyd og events --> realtime
+	browser -- Create session --> api
+	api -- Short-lived client secret --> realtime
+	browser <-- WebRTC: audio and events --> realtime
 
 	realtime -- search_knowledge_base --> browser
-	browser -- Knowledge-søgning --> api
-	api -- Hybrid søgning --> index
-	index -- Grounded kilder --> api
-	api -- Tool-resultat --> browser
-	browser -- Function-call-output --> realtime
+	browser -- Knowledge search --> api
+	api -- Hybrid search --> index
+	index -- Grounding sources --> api
+	api -- Tool result --> browser
+	browser -- Function call output --> realtime
 
-	browser -- Upload dokumenter --> api
-	api -- PDF, DOCX og TXT --> blob
-	api -- Start indeksering --> indexer
+	browser -- Upload documents --> api
+	api -- PDF, DOCX and TXT --> blob
+	api -- Start indexing --> indexer
 	blob --> indexer
-	indexer -- Chunking og sprogdetektion --> embeddings
-	embeddings -- 3072-dimensionelle vektorer --> index
+	indexer -- Chunking and language detection --> embeddings
+	embeddings -- 3072-dimensional vectors --> index
 ```
 
-- Browseren forbinder direkte til GPT Realtime med WebRTC og en kortlivet client secret fra FastAPI.
-- FastAPI bruger `DefaultAzureCredential`; ingen Azure API-nøgler ligger i kildekoden.
-- Dokumenter gemmes i Blob Storage og chunkes/vektoriseres af Azure AI Search.
-- Hybrid semantic/vector search bruger `text-embedding-3-large` med 3072 dimensioner.
-- Azure Container Apps hoster både API og den statiske browserklient.
+- The browser connects directly to GPT Realtime through WebRTC using a short-lived client secret from FastAPI.
+- FastAPI uses `DefaultAzureCredential`; no Azure API keys are stored in the source code.
+- Documents are stored in Blob Storage and chunked/vectorized by Azure AI Search.
+- Hybrid semantic/vector search uses `text-embedding-3-large` with 3072 dimensions.
+- Azure Container Apps hosts both the API and the static browser client.
 
-De eksisterende deployments `gpt-realtime-1.5` og `text-embedding-3-large` på `proj-ai103-resource` genbruges.
+The existing `gpt-realtime-1.5` and `text-embedding-3-large` deployments on `proj-ai103-resource` are reused.
 
-## Lokal kørsel
+## Run locally
 
-Forudsætninger:
+Prerequisites:
 
 - Python 3.12
-- Azure CLI-login med adgang til Foundry, Search og Storage
-- De nødvendige lokale data-plane roller
+- An Azure CLI login with access to Foundry, Search, and Storage
+- The required local data-plane roles
 
 ```powershell
 python -m venv .venv
@@ -68,22 +70,22 @@ Copy-Item .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Åbn `http://127.0.0.1:8000`, tillad mikrofonadgang, og vælg Auto, Dansk eller English.
+Open `http://127.0.0.1:8000`, allow microphone access, and select Auto, Dansk, or English.
 
-Knowledge base kræver værdier for `AZURE_SEARCH_ENDPOINT` og `AZURE_STORAGE_ACCOUNT_URL` i `.env`. Realtime-delen kan testes separat.
+The knowledge base requires values for `AZURE_SEARCH_ENDPOINT` and `AZURE_STORAGE_ACCOUNT_URL` in `.env`. The realtime functionality can be tested separately.
 
-## Kvalitetschecks
+## Quality checks
 
 ```powershell
 .\.venv\Scripts\python.exe -m ruff check app tests scripts
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Den manuelle sprog- og retrievalmatrix findes i [docs/manual-test-plan.md](docs/manual-test-plan.md).
+The manual language and retrieval matrix is available in [docs/manual-test-plan.md](docs/manual-test-plan.md).
 
 ## Azure deployment
 
-Projektet bruger azd, Bicep, remote ACR build og managed identities.
+The project uses azd, Bicep, remote ACR builds, and managed identities.
 
 ```powershell
 azd auth login
@@ -95,14 +97,14 @@ azd provision --no-prompt
 azd deploy --no-prompt
 ```
 
-ID-token-udstedelse er påkrævet af Container Apps Easy Auths hybrid-flow. Container Apps og ACR deployes i to trin, så `AcrPull`-rollen kan propagere mellem provisionering og image-deployment. Search index, data source, skillset og indexer oprettes idempotent af post-provision-hooken.
+ID token issuance is required by the Container Apps Easy Auth hybrid flow. Container Apps and ACR are deployed in two stages so the `AcrPull` role can propagate between provisioning and image deployment. The Search index, data source, skillset, and indexer are created idempotently by the post-provision hook.
 
-## Sikkerhed
+## Security
 
-- Runtime-adgang bruger Entra ID og managed identity.
-- Storage og Search har lokal nøgleauth deaktiveret.
-- Rå lyd gemmes ikke.
-- Uploads er begrænset til PDF, DOCX og TXT på højst 20 MB.
-- `.env` og `.azure` er ignoreret af Git.
+- Runtime access uses Entra ID and managed identity.
+- Local key authentication is disabled for Storage and Search.
+- Raw audio is not stored.
+- Uploads are limited to PDF, DOCX, and TXT files of up to 20 MB.
+- `.env` and `.azure` are ignored by Git.
 
-`learning.py` er det oprindelige Python-læringsscript og er ikke en del af webappen.
+`learning.py` is the original Python learning script and is not part of the web application.
