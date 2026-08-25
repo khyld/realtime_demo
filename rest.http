@@ -1,0 +1,9 @@
+@apimKey = {{$dotenv APIM_SUBSCRIPTION_KEY}}
+
+GET https://apim-dev-sweden-hol-ais-001.developer.azure-api.net/colors/random
+Ocp-Apim-Subscription-Key: {{apimKey}}
+
+###
+
+GET https://apim-dev-sweden-hol-ais-001.azure-api.net/petstore/pet/findByStatus?status=available
+Ocp-Apim-Subscription-Key: {{apimKey}}

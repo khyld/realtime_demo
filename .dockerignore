@@ -1,0 +1,15 @@
+.azure
+.env
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+data
+docs
+infra
+scripts
+tests
+test-results
+*.pyc

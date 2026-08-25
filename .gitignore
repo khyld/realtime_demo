@@ -1,0 +1,25 @@
+.env
+.env.*
+!.env.example
+.azure/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local knowledge-base content and generated test output
+data/
+uploads/
+test-results/
+
+# Editor and OS files
+.vscode/*.local.json
+.DS_Store
+Thumbs.db

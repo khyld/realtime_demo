@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Test dansk og engelsk tale med GPT Realtime og egne dokumenter.">
+  <title>Realtime Sproglab</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">GPT Realtime</p>
+      <h1>Sproglab</h1>
+    </div>
+    <div class="connection" aria-live="polite">
+      <span id="statusDot" class="status-dot"></span>
+      <span id="connectionStatus">Ikke forbundet</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="conversation-panel" aria-labelledby="conversationTitle">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Live session</p>
+          <h2 id="conversationTitle">Samtale</h2>
+        </div>
+        <div class="language-control" role="group" aria-label="Samtalesprog">
+          <button type="button" class="language-option active" data-language="auto">Auto</button>
+          <button type="button" class="language-option" data-language="da">Dansk</button>
+          <button type="button" class="language-option" data-language="en">English</button>
+        </div>
+      </div>
+
+      <div id="transcript" class="transcript" aria-live="polite">
+        <div class="empty-state">
+          <i data-lucide="audio-lines" aria-hidden="true"></i>
+          <p>Start mikrofonen og tal naturligt på dansk eller engelsk.</p>
+        </div>
+      </div>
+
+      <div class="session-controls">
+        <button id="startButton" type="button" class="primary-button">
+          <i data-lucide="mic" aria-hidden="true"></i>
+          Start samtale
+        </button>
+        <button id="stopButton" type="button" class="secondary-button" disabled>
+          <i data-lucide="square" aria-hidden="true"></i>
+          Stop
+        </button>
+        <span id="activityText" class="activity-text">Klar</span>
+      </div>
+      <audio id="remoteAudio" autoplay></audio>
+    </section>
+
+    <aside class="side-rail">
+      <section class="knowledge-section" aria-labelledby="knowledgeTitle">
+        <div class="section-heading compact">
+          <div>
+            <p class="section-kicker">Grounding</p>
+            <h2 id="knowledgeTitle">Knowledge base</h2>
+          </div>
+          <i data-lucide="library" aria-hidden="true"></i>
+        </div>
+        <form id="uploadForm" class="upload-form">
+          <label class="file-drop" for="documentInput">
+            <i data-lucide="file-up" aria-hidden="true"></i>
+            <span>Vælg PDF, DOCX eller TXT-filer</span>
+            <small>Maks. 10 filer, 20 MB pr. fil</small>
+          </label>
+          <input id="documentInput" name="file" type="file" accept=".pdf,.docx,.txt" multiple hidden>
+          <button id="uploadButton" type="submit" class="secondary-button wide" disabled>
+            <i data-lucide="upload" aria-hidden="true"></i>
+            Upload dokumenter
+          </button>
+          <p id="uploadStatus" class="inline-status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="sources-section" aria-labelledby="sourcesTitle">
+        <div class="section-heading compact">
+          <div>
+            <p class="section-kicker">Seneste svar</p>
+            <h2 id="sourcesTitle">Kilder</h2>
+          </div>
+          <span id="sourceCount" class="count">0</span>
+        </div>
+        <ol id="sourceList" class="source-list">
+          <li class="muted">Ingen kilder endnu.</li>
+        </ol>
+      </section>
+
+      <details class="event-details">
+        <summary><i data-lucide="terminal" aria-hidden="true"></i> Teknisk eventlog</summary>
+        <ol id="eventLog" class="event-log"></ol>
+      </details>
+    </aside>
+  </main>
+</body>
+</html>

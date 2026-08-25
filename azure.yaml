@@ -1,0 +1,23 @@
+name: bilingual-realtime-lab
+metadata:
+  template: bilingual-realtime-lab@0.1.0
+infra:
+  provider: bicep
+  path: infra
+  module: main
+  parameters: main.bicepparam
+services:
+  web:
+    project: .
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      remoteBuild: true
+hooks:
+  postprovision:
+    shell: pwsh
+    run: ./.venv/Scripts/python.exe scripts/configure_search.py
+    continueOnError: false
+    interactive: false
