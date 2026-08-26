@@ -35,6 +35,7 @@ async def test_create_client_secret_uses_ga_endpoint_and_entra_token() -> None:
     assert session["audio"]["input"]["transcription"]["model"] == "gpt-4o-mini-transcribe"
     assert session["audio"]["input"]["turn_detection"] == {
         "type": "server_vad",
+        "silence_duration_ms": 300,
         "create_response": True,
         "interrupt_response": True,
     }

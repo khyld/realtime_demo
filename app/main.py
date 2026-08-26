@@ -1,5 +1,6 @@
 import logging
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 from uuid import uuid4
 
@@ -20,7 +21,42 @@ from app.services.realtime import RealtimeService, RealtimeSessionError
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Bilingual Realtime Lab", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    credential = DefaultAzureCredential()
+    realtime_client = httpx.AsyncClient(timeout=30)
+    app.state.credential = credential
+    app.state.realtime_client = realtime_client
+
+    if settings.azure_search_endpoint and settings.azure_storage_account_url:
+        app.state.search_client = SearchClient(
+            settings.azure_search_endpoint,
+            settings.azure_search_index_name,
+            credential,
+        )
+        app.state.indexer_client = SearchIndexerClient(
+            settings.azure_search_endpoint,
+            credential,
+        )
+        app.state.blob_service_client = BlobServiceClient(
+            settings.azure_storage_account_url,
+            credential,
+        )
+
+    try:
+        yield
+    finally:
+        if hasattr(app.state, "search_client"):
+            await app.state.search_client.close()
+            await app.state.indexer_client.close()
+            await app.state.blob_service_client.close()
+        await realtime_client.aclose()
+        await credential.close()
+
+
+app = FastAPI(title="Bilingual Realtime Lab", version="0.1.0", lifespan=lifespan)
 
 
 class SessionRequest(BaseModel):
@@ -43,45 +79,32 @@ class DeleteKnowledgeDocumentsRequest(BaseModel):
 
 
 async def get_realtime_service(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> AsyncIterator[RealtimeService]:
-    credential = DefaultAzureCredential()
-    async with httpx.AsyncClient(timeout=30) as client:
-        try:
-            yield RealtimeService(settings, credential, client)
-        finally:
-            await credential.close()
+) -> RealtimeService:
+    return RealtimeService(
+        settings,
+        request.app.state.credential,
+        request.app.state.realtime_client,
+    )
 
 
 async def get_knowledge_service(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> AsyncIterator[KnowledgeService]:
+) -> KnowledgeService:
     if not settings.azure_search_endpoint or not settings.azure_storage_account_url:
         raise HTTPException(status_code=503, detail="Knowledge base is not configured")
 
-    credential = DefaultAzureCredential()
-    search_client = SearchClient(
-        settings.azure_search_endpoint,
-        settings.azure_search_index_name,
-        credential,
-    )
-    indexer_client = SearchIndexerClient(settings.azure_search_endpoint, credential)
-    blob_service_client = BlobServiceClient(settings.azure_storage_account_url, credential)
-    container_client = blob_service_client.get_container_client(
+    container_client = request.app.state.blob_service_client.get_container_client(
         settings.azure_storage_container_name
     )
-    try:
-        yield KnowledgeService(
-            container_client,
-            search_client,
-            indexer_client,
-            settings.azure_search_indexer_name,
-        )
-    finally:
-        await search_client.close()
-        await indexer_client.close()
-        await blob_service_client.close()
-        await credential.close()
+    return KnowledgeService(
+        container_client,
+        request.app.state.search_client,
+        request.app.state.indexer_client,
+        settings.azure_search_indexer_name,
+    )
 
 
 @app.middleware("http")
