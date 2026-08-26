@@ -8,11 +8,19 @@ param location string = resourceGroup().location
 
 param principalId string
 
-param existingFoundryResourceName string = 'proj-ai103-resource'
+param foundryResourceName string = ''
 
 param realtimeDeploymentName string = 'gpt-realtime-1.5'
 
+param realtimeModelVersion string = '2026-02-23'
+
 param embeddingDeploymentName string = 'text-embedding-3-large'
+
+param embeddingModelVersion string = '1'
+
+param transcriptionDeploymentName string = 'gpt-4o-mini-transcribe'
+
+param transcriptionModelVersion string = '2025-12-15'
 
 param searchSku string = 'serverless'
 
@@ -23,20 +31,86 @@ param entraClientId string = ''
 
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
 var normalizedEnvironment = toLower(replace(environmentName, '_', '-'))
+var resolvedFoundryResourceName = empty(foundryResourceName) ? 'aifd-${normalizedEnvironment}-${take(resourceToken, 8)}' : foundryResourceName
 var tags = {
   environment: environmentName
   application: 'bilingual-realtime-lab'
   'azd-env-name': environmentName
 }
 
-resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
-  name: existingFoundryResourceName
-}
-
 resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: 'id-realtime-${normalizedEnvironment}'
   location: location
   tags: tags
+}
+
+resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+  name: resolvedFoundryResourceName
+  location: location
+  tags: tags
+  kind: 'AIServices'
+  sku: {
+    name: 'S0'
+  }
+  properties: {
+    customSubDomainName: resolvedFoundryResourceName
+    disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource realtimeDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: foundry
+  name: realtimeDeploymentName
+  sku: {
+    name: 'GlobalStandard'
+    capacity: 1
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-realtime-1.5'
+      version: realtimeModelVersion
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+}
+
+resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: foundry
+  name: embeddingDeploymentName
+  sku: {
+    name: 'Standard'
+    capacity: 120
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-large'
+      version: embeddingModelVersion
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+}
+
+resource transcriptionDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: foundry
+  name: transcriptionDeploymentName
+  sku: {
+    name: 'GlobalStandard'
+    capacity: 1
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o-mini-transcribe'
+      version: transcriptionModelVersion
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
 }
 
 resource storage 'Microsoft.Storage/storageAccounts@2025-01-01' = {
@@ -109,45 +183,13 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
 }
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'log-realtime-${normalizedEnvironment}'
-  location: location
-  tags: tags
-  properties: {
-    features: {
-      enableLogAccessUsingOnlyResourcePermissions: true
-    }
-    retentionInDays: 30
-    sku: {
-      name: 'PerGB2018'
-    }
-  }
-}
-
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'appi-realtime-${normalizedEnvironment}'
-  location: location
-  kind: 'web'
-  tags: tags
-  properties: {
-    Application_Type: 'web'
-    DisableLocalAuth: true
-    IngestionMode: 'LogAnalytics'
-    WorkspaceResourceId: logAnalytics.id
-  }
-}
-
 resource containerEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' = {
   name: 'cae-realtime-${normalizedEnvironment}'
   location: location
   tags: tags
   properties: {
     appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalytics.properties.customerId
-        sharedKey: logAnalytics.listKeys().primarySharedKey
-      }
+      destination: 'none'
     }
     zoneRedundant: false
   }
@@ -200,11 +242,15 @@ resource web 'Microsoft.App/containerApps@2025-01-01' = {
             }
             {
               name: 'AZURE_OPENAI_RESOURCE'
-              value: existingFoundryResourceName
+              value: foundry.name
             }
             {
               name: 'AZURE_OPENAI_REALTIME_DEPLOYMENT'
               value: realtimeDeploymentName
+            }
+            {
+              name: 'AZURE_OPENAI_TRANSCRIPTION_DEPLOYMENT'
+              value: transcriptionDeploymentName
             }
             {
               name: 'AZURE_SEARCH_ENDPOINT'
@@ -225,10 +271,6 @@ resource web 'Microsoft.App/containerApps@2025-01-01' = {
             {
               name: 'AZURE_STORAGE_CONTAINER_NAME'
               value: knowledgeContainer.name
-            }
-            {
-              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-              value: appInsights.properties.ConnectionString
             }
           ]
           probes: [
@@ -296,7 +338,6 @@ resource webAuth 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (!emp
 
 var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 var openAiUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-var openAiContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a001fd3d-188f-4b5d-821b-7da978bf7442')
 var storageBlobContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 var storageBlobReaderRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')
 var cognitiveServicesUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
@@ -323,13 +364,13 @@ resource runtimeFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
-resource searchFoundryContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(foundry.id, search.id, openAiContributorRoleId)
+resource searchFoundryOpenAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundry.id, search.id, openAiUserRoleId)
   scope: foundry
   properties: {
     principalId: search.identity.principalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: openAiContributorRoleId
+    roleDefinitionId: openAiUserRoleId
   }
 }
 
@@ -394,11 +435,12 @@ resource deployerSearchContributor 'Microsoft.Authorization/roleAssignments@2022
 }
 
 output AZURE_LOCATION string = location
-output AZURE_OPENAI_RESOURCE string = existingFoundryResourceName
+output AZURE_OPENAI_RESOURCE string = foundry.name
 output AZURE_OPENAI_REALTIME_DEPLOYMENT string = realtimeDeploymentName
 output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingDeploymentName
-output AZURE_OPENAI_ENDPOINT string = 'https://${existingFoundryResourceName}.openai.azure.com'
-output AZURE_AI_SERVICES_ENDPOINT string = 'https://${existingFoundryResourceName}.cognitiveservices.azure.com'
+output AZURE_OPENAI_TRANSCRIPTION_DEPLOYMENT string = transcriptionDeploymentName
+output AZURE_OPENAI_ENDPOINT string = 'https://${foundry.name}.openai.azure.com'
+output AZURE_AI_SERVICES_ENDPOINT string = 'https://${foundry.name}.cognitiveservices.azure.com'
 output AZURE_SEARCH_ENDPOINT string = 'https://${search.name}.search.windows.net'
 output AZURE_SEARCH_INDEX_NAME string = 'knowledge-chunks'
 output AZURE_SEARCH_INDEXER_NAME string = 'knowledge-indexer'
@@ -406,7 +448,6 @@ output AZURE_STORAGE_ACCOUNT_ID string = storage.id
 output AZURE_STORAGE_ACCOUNT_URL string = 'https://${storage.name}.blob.${environment().suffixes.storage}'
 output AZURE_STORAGE_CONTAINER_NAME string = knowledgeContainer.name
 output AZURE_CLIENT_ID string = runtimeIdentity.properties.clientId
-output APPLICATIONINSIGHTS_CONNECTION_STRING string = appInsights.properties.ConnectionString
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.properties.loginServer
 output SERVICE_WEB_NAME string = web.name
 output SERVICE_WEB_URI string = 'https://${web.properties.configuration.ingress.fqdn}'

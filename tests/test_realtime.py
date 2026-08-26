@@ -8,6 +8,8 @@ from azure.core.credentials import AccessToken
 from app.config import Settings
 from app.services.realtime import RealtimeService, RealtimeSessionError
 
+TEST_SETTINGS = Settings(azure_openai_resource="test-foundry-resource")
+
 
 @pytest.mark.asyncio
 async def test_create_client_secret_uses_ga_endpoint_and_entra_token() -> None:
@@ -21,7 +23,7 @@ async def test_create_client_secret_uses_ga_endpoint_and_entra_token() -> None:
     credential = AsyncMock()
     credential.get_token.return_value = AccessToken("entra-token", 9999)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        service = RealtimeService(Settings(), credential, client)
+        service = RealtimeService(TEST_SETTINGS, credential, client)
         result = await service.create_client_secret("en")
 
     assert captured_request is not None
@@ -50,7 +52,7 @@ async def test_create_client_secret_rejects_missing_secret() -> None:
     credential = AsyncMock()
     credential.get_token.return_value = AccessToken("entra-token", 9999)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        service = RealtimeService(Settings(), credential, client)
+        service = RealtimeService(TEST_SETTINGS, credential, client)
         with pytest.raises(RealtimeSessionError):
             await service.create_client_secret("auto")
 
@@ -73,7 +75,7 @@ async def test_create_client_secret_retries_transient_transport_error(
     credential = AsyncMock()
     credential.get_token.return_value = AccessToken("entra-token", 9999)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        service = RealtimeService(Settings(), credential, client)
+        service = RealtimeService(TEST_SETTINGS, credential, client)
         result = await service.create_client_secret("da")
 
     assert attempts == 2

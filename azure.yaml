@@ -16,6 +16,11 @@ services:
       context: .
       remoteBuild: true
 hooks:
+  preup:
+    shell: pwsh
+    run: ./scripts/select_resource_group.ps1
+    continueOnError: false
+    interactive: true
   postprovision:
     shell: pwsh
     run: ./.venv/Scripts/python.exe scripts/configure_search.py

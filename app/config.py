@@ -12,7 +12,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    azure_openai_resource: str = "proj-ai103-resource"
+    azure_openai_resource: str
     azure_openai_realtime_deployment: str = "gpt-realtime-1.5"
     azure_openai_transcription_deployment: str = "gpt-4o-mini-transcribe"
     azure_openai_voice: Literal[

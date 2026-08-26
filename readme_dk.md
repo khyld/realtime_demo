@@ -52,7 +52,7 @@ flowchart LR
 - Hybrid semantic/vector search bruger `text-embedding-3-large` med 3072 dimensioner.
 - Azure Container Apps hoster både API og den statiske browserklient.
 
-De eksisterende deployments `gpt-realtime-1.5` og `text-embedding-3-large` på `proj-ai103-resource` genbruges.
+`azd up` opretter en dedikeret Foundry-ressource i den valgte resource group sammen med deployments til `gpt-realtime-1.5`, `text-embedding-3-large` og `gpt-4o-mini-transcribe`. Deploymentnavne og modelversioner kan konfigureres via azd-miljøet.
 
 ## Lokal kørsel
 
@@ -85,7 +85,7 @@ Den manuelle sprog- og retrievalmatrix findes i [docs/manual-test-plan.md](docs/
 
 ## Azure deployment
 
-Projektet bruger azd, Bicep, remote ACR build og managed identities.
+Projektet bruger azd, Bicep, remote ACR build og managed identities. Under `azd up` bliver du spurgt, hvilken eksisterende eller ny resource group demoen skal installeres i.
 
 ```powershell
 azd auth login
