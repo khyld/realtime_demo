@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Test dansk og engelsk tale med GPT Realtime og egne dokumenter.">
   <title>Realtime Sproglab</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=4">
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
   <script src="/app.js?v=3" defer></script>
 </head>
@@ -35,7 +35,7 @@
         </div>
       </div>
 
-      <div id="transcript" class="transcript" aria-live="polite">
+      <div id="transcript" class="transcript" aria-label="Samtalehistorik" aria-live="polite" aria-relevant="additions" tabindex="0">
         <div class="empty-state">
           <i data-lucide="audio-lines" aria-hidden="true"></i>
           <p>Start mikrofonen og tal naturligt på dansk eller engelsk.</p>

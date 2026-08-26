@@ -169,10 +169,11 @@ async function startSession() {
     state.dataChannel = state.peerConnection.createDataChannel("realtime-channel");
     state.dataChannel.addEventListener("open", () => {
       setConnection("connected", "Forbundet");
-      elements.activity.textContent = "Lytter";
+      elements.activity.textContent = "Assistenten hilser";
       elements.stop.disabled = false;
       elements.sendQuestionButton.disabled = false;
       logEvent("Data channel åbnet");
+      sendWelcomeGreeting();
     });
     state.dataChannel.addEventListener("message", handleRealtimeEvent);
     state.dataChannel.addEventListener("close", () => logEvent("Data channel lukket"));
@@ -296,6 +297,21 @@ function sendRealtimeEvent(event) {
   if (state.dataChannel?.readyState === "open") {
     state.dataChannel.send(JSON.stringify(event));
   }
+}
+
+function sendWelcomeGreeting() {
+  const instructions = {
+    da: "Hils kort på dansk, og spørg om der er noget, du kan hjælpe med.",
+    en: "Give a brief greeting in English and ask whether there is anything you can help with.",
+    auto: "Give a brief English greeting, then ask whether there is anything you can help with and tell that you are bilingual",
+  };
+
+  sendRealtimeEvent({
+    type: "response.create",
+    response: {
+      instructions: instructions[state.language] || instructions.auto,
+    },
+  });
 }
 
 function sendTypedQuestion() {
