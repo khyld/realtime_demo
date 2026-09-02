@@ -106,5 +106,3 @@ ID token issuance is required by the Container Apps Easy Auth hybrid flow. Conta
 - Raw audio is not stored.
 - Uploads are limited to PDF, DOCX, and TXT files of up to 20 MB.
 - `.env` and `.azure` are ignored by Git.
-
-`learning.py` is the original Python learning script and is not part of the web application.

@@ -219,7 +219,6 @@ Open the URL returned by `azd up` and verify that it redirects to Microsoft sign
 ## 11. Notes
 
 - The app reads configuration from `.env` via `app/config.py`.
-- `learning.py` is an older learning script and is not part of the web app.
 - The project uses Azure identity and managed access rather than embedded API keys.
 
 ## 12. Typical causes of issues

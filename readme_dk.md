@@ -106,5 +106,3 @@ ID-token-udstedelse er påkrævet af Container Apps Easy Auths hybrid-flow. Cont
 - Rå lyd gemmes ikke.
 - Uploads er begrænset til PDF, DOCX og TXT på højst 20 MB.
 - `.env` og `.azure` er ignoreret af Git.
-
-`learning.py` er det oprindelige Python-læringsscript og er ikke en del af webappen.
