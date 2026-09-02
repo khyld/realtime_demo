@@ -106,3 +106,43 @@ ID-token-udstedelse er påkrævet af Container Apps Easy Auths hybrid-flow. Cont
 - Rå lyd gemmes ikke.
 - Uploads er begrænset til PDF, DOCX og TXT på højst 20 MB.
 - `.env` og `.azure` er ignoreret af Git.
+
+## Azure RBAC
+
+### Roller provisioneret af Bicep
+
+Tildelingerne nedenfor er den reproducerbare source of truth, som er defineret i `infra/main.bicep`.
+
+| Principal | Scope | Rolle | Formål |
+|---|---|---|---|
+| Container Apps user-assigned managed identity | Container Registry | `AcrPull` | Hente applikationens container-image |
+| Container Apps user-assigned managed identity | Foundry-resource | `Cognitive Services OpenAI User` | Oprette Realtime-sessioner og bruge deployerede modeller |
+| Container Apps user-assigned managed identity | Storage account | `Storage Blob Data Contributor` | Liste, uploade og slette knowledge-dokumenter |
+| Container Apps user-assigned managed identity | Azure AI Search | `Search Index Data Reader` | Søge i knowledge-indekset |
+| Container Apps user-assigned managed identity | Azure AI Search | `Search Service Contributor` | Starte og aflæse Search-indexeren |
+| Azure AI Search system-assigned managed identity | Storage account | `Storage Blob Data Reader` | Læse kildedokumenter under indeksering |
+| Azure AI Search system-assigned managed identity | Foundry-resource | `Cognitive Services OpenAI User` | Generere embeddings med den konfigurerede modeldeployment |
+| Azure AI Search system-assigned managed identity | Foundry-resource | `Cognitive Services User` | Bruge AI Services enrichment-skillsettet |
+| Brugeren der deployer (`principalId`) | Azure AI Search | `Search Service Contributor` | Oprette og opdatere index, data source, skillset og indexer |
+| Brugeren der deployer (`principalId`) | Azure AI Search | `Search Index Data Reader` | Validere og søge i det konfigurerede index |
+
+Container Apps Easy Auth styrer slutbrugernes adgang til webapplikationen separat fra disse Azure RBAC-tildelinger.
+
+### Snapshot af det aktuelle demo-miljø
+
+Kontrolleret **2026-09-02** i resource groups `dbhackathon-rg` og `dbhackathon`. Dette er et operationelt snapshot, som kan drive; Azure og `infra/main.bicep` skal kontrolleres igen efter ændringer i rettigheder eller deployment.
+
+De aktuelle demo-ressourcer matcher ikke Bicep-topologien fuldstændigt: `dbhackathon-rg` hoster applikationen i App Service, mens Bicep-templaten provisionerer Azure Container Apps.
+
+| Principal | Ressource/scope | Observeret tildeling |
+|---|---|---|
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-openai` | `Cognitive Services OpenAI User` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-search` | `Search Index Data Reader` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice5174` | `Storage Blob Data Reader` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbhackathon-rg` | `Storage Blob Data Reader` (arves af ressourcer i gruppen og dublerer den direkte Storage reader-tildeling) |
+| To brugerprincipaler, inklusive `khyld@microsoft.com` | `dbvoice5174` | `Storage Blob Data Contributor` |
+| De samme to brugerprincipaler | `dbvoice-search` | `Search Index Data Reader` og `Search Index Data Contributor` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `db-demo-foundry-resource` i `dbhackathon` | `Cognitive Services OpenAI User` |
+| En yderligere service principal | `db-demo-foundry-resource` i `dbhackathon` | `Reader` |
+
+Der blev ikke fundet en direkte rolletildeling på selve App Service-ressourcen. Azure AI Search-identiteten findes, men der blev ikke returneret en direkte tildeling til den i dette snapshot.

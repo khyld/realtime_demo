@@ -106,3 +106,43 @@ ID token issuance is required by the Container Apps Easy Auth hybrid flow. Conta
 - Raw audio is not stored.
 - Uploads are limited to PDF, DOCX, and TXT files of up to 20 MB.
 - `.env` and `.azure` are ignored by Git.
+
+## Azure RBAC
+
+### Roles provisioned by Bicep
+
+The assignments below are the repeatable source of truth defined in `infra/main.bicep`.
+
+| Principal | Scope | Role | Purpose |
+|---|---|---|---|
+| Container App user-assigned managed identity | Container Registry | `AcrPull` | Pull the application image |
+| Container App user-assigned managed identity | Foundry resource | `Cognitive Services OpenAI User` | Create Realtime sessions and use deployed models |
+| Container App user-assigned managed identity | Storage account | `Storage Blob Data Contributor` | List, upload, and delete knowledge documents |
+| Container App user-assigned managed identity | Azure AI Search | `Search Index Data Reader` | Query the knowledge index |
+| Container App user-assigned managed identity | Azure AI Search | `Search Service Contributor` | Run and inspect the Search indexer |
+| Azure AI Search system-assigned managed identity | Storage account | `Storage Blob Data Reader` | Read source documents during indexing |
+| Azure AI Search system-assigned managed identity | Foundry resource | `Cognitive Services OpenAI User` | Generate embeddings through the configured model deployment |
+| Azure AI Search system-assigned managed identity | Foundry resource | `Cognitive Services User` | Use the AI Services enrichment skillset |
+| Deploying user (`principalId`) | Azure AI Search | `Search Service Contributor` | Create and update the index, data source, skillset, and indexer |
+| Deploying user (`principalId`) | Azure AI Search | `Search Index Data Reader` | Validate and query the configured index |
+
+Container Apps Easy Auth controls end-user access to the web application separately from these Azure RBAC assignments.
+
+### Current demo environment snapshot
+
+Verified on **2026-09-02** in the `dbhackathon-rg` and `dbhackathon` resource groups. This is an operational snapshot and can drift; Azure and `infra/main.bicep` should be checked again after permission or deployment changes.
+
+The current demo resources do not exactly match the Bicep topology: `dbhackathon-rg` hosts the application in App Service, while the Bicep template provisions Azure Container Apps.
+
+| Principal | Resource/scope | Observed assignment |
+|---|---|---|
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-openai` | `Cognitive Services OpenAI User` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-search` | `Search Index Data Reader` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice5174` | `Storage Blob Data Reader` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `dbhackathon-rg` | `Storage Blob Data Reader` (inherited by resources in the group; duplicates the direct Storage reader assignment) |
+| Two user principals, including `khyld@microsoft.com` | `dbvoice5174` | `Storage Blob Data Contributor` |
+| The same two user principals | `dbvoice-search` | `Search Index Data Reader` and `Search Index Data Contributor` |
+| App Service managed identity for `dbvoice-live-demo-5174` | `db-demo-foundry-resource` in `dbhackathon` | `Cognitive Services OpenAI User` |
+| One additional service principal | `db-demo-foundry-resource` in `dbhackathon` | `Reader` |
+
+No direct role assignment was observed on the App Service resource itself. The Azure AI Search managed identity exists, but no direct assignment for it was returned in this snapshot.
