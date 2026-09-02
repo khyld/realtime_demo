@@ -434,6 +434,16 @@ resource deployerSearchContributor 'Microsoft.Authorization/roleAssignments@2022
   }
 }
 
+resource deployerSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(search.id, principalId, searchDataReaderRoleId)
+  scope: search
+  properties: {
+    principalId: principalId
+    principalType: 'User'
+    roleDefinitionId: searchDataReaderRoleId
+  }
+}
+
 output AZURE_LOCATION string = location
 output AZURE_OPENAI_RESOURCE string = foundry.name
 output AZURE_OPENAI_REALTIME_DEPLOYMENT string = realtimeDeploymentName

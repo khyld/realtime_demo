@@ -72,7 +72,7 @@ uvicorn app.main:app --reload
 
 Open `http://127.0.0.1:8000`, allow microphone access, and select Auto, Dansk, or English.
 
-The knowledge base requires values for `AZURE_SEARCH_ENDPOINT` and `AZURE_STORAGE_ACCOUNT_URL` in `.env`. The realtime functionality can be tested separately.
+The knowledge base requires values for `AZURE_SEARCH_ENDPOINT` and `AZURE_STORAGE_ACCOUNT_URL` in `.env`. The storage URL must be the account endpoint without the container name, for example `https://<account>.blob.core.windows.net`; configure the container separately with `AZURE_STORAGE_CONTAINER_NAME`. The realtime functionality can be tested separately.
 
 ## Quality checks
 

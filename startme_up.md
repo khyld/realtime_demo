@@ -2,10 +2,31 @@
 
 This file is a quick reference for starting the application locally and for understanding the project setup.
 
+## Daily startup
+
+Open PowerShell and run:
+
+```powershell
+cd C:\Github\realtime_demo
+.\.venv\Scripts\Activate.ps1
+az account get-access-token --resource https://storage.azure.com/ --output none
+uvicorn app.main:app --reload
+```
+
+If the Azure token check fails, sign in to the tenant that owns the demo resources and then start the app:
+
+```powershell
+az logout
+az login --tenant 1a8f6d42-be1a-4de7-a668-2857bc39ce8a --scope https://storage.azure.com/.default
+uvicorn app.main:app --reload
+```
+
+Open `http://127.0.0.1:8000`, allow microphone access, and start a new conversation. The existing `.env`, virtual environment, Azure resources, uploaded documents, and role assignments are reused.
+
 ## 1. Open a terminal in the project folder
 
 ```powershell
-cd C:\Github\MyLearning
+cd C:\Github\realtime_demo
 ```
 
 ## 2. Activate the virtual environment
@@ -17,7 +38,7 @@ cd C:\Github\MyLearning
 If the virtual environment does not exist yet:
 
 ```powershell
-cd C:\Github\MyLearning
+cd C:\Github\realtime_demo
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
@@ -31,7 +52,7 @@ pip install -e ".[dev]"
 ## 4. Create the local environment file
 
 ```powershell
-Copy-Item .env.example .env
+# Copy-Item .env.example .env
 ```
 
 Then fill in the required Azure values in `.env`, especially:
