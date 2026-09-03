@@ -128,21 +128,30 @@ Tildelingerne nedenfor er den reproducerbare source of truth, som er defineret i
 
 Container Apps Easy Auth styrer slutbrugernes adgang til webapplikationen separat fra disse Azure RBAC-tildelinger.
 
-### Snapshot af det aktuelle demo-miljø
+### Krævet demo-miljø
 
-Kontrolleret **2026-09-02** i resource groups `dbhackathon-rg` og `dbhackathon`. Dette er et operationelt snapshot, som kan drive; Azure og `infra/main.bicep` skal kontrolleres igen efter ændringer i rettigheder eller deployment.
+For denne demo er den forventede Azure-kontekst:
 
-De aktuelle demo-ressourcer matcher ikke Bicep-topologien fuldstændigt: `dbhackathon-rg` hoster applikationen i App Service, mens Bicep-templaten provisionerer Azure Container Apps.
+- Tenant: `1a8f6d42-be1a-4de7-a668-2857bc39ce8a`
+- Subscription: `40bfcd72-ab71-4a15-be1a-be1cff1d2498`
+- Resource group: `rg-ai103`
 
-| Principal | Ressource/scope | Observeret tildeling |
-|---|---|---|
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-openai` | `Cognitive Services OpenAI User` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-search` | `Search Index Data Reader` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice5174` | `Storage Blob Data Reader` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbhackathon-rg` | `Storage Blob Data Reader` (arves af ressourcer i gruppen og dublerer den direkte Storage reader-tildeling) |
-| To brugerprincipaler, inklusive `khyld@microsoft.com` | `dbvoice5174` | `Storage Blob Data Contributor` |
-| De samme to brugerprincipaler | `dbvoice-search` | `Search Index Data Reader` og `Search Index Data Contributor` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `db-demo-foundry-resource` i `dbhackathon` | `Cognitive Services OpenAI User` |
-| En yderligere service principal | `db-demo-foundry-resource` i `dbhackathon` | `Reader` |
+Appen bruger `DefaultAzureCredential`, så den aktive Azure CLI-session skal være logget ind med den korrekte tenant og subscription, før realtime-sessionen kan startes. Hvis den forkerte tenant eller subscription er aktiv, kan backenden køre, men oprettelsen af realtime-sessionen vil fejle med meddelelsen: `Could not start the realtime session`.
 
-Der blev ikke fundet en direkte rolletildeling på selve App Service-ressourcen. Azure AI Search-identiteten findes, men der blev ikke returneret en direkte tildeling til den i dette snapshot.
+```powershell
+az login --tenant 1a8f6d42-be1a-4de7-a668-2857bc39ce8a
+az account set --subscription 40bfcd72-ab71-4a15-be1a-be1cff1d2498
+az account show --output table
+az group show --name rg-ai103 --subscription 40bfcd72-ab71-4a15-be1a-be1cff1d2498 --output table
+```
+
+### RBAC-checkliste til demoen
+
+Før appen prøves igen, skal du kontrollere, at den indloggede principal har de nødvendige Azure RBAC-tildelinger på ressourcerne i `rg-ai103`, især Foundry/OpenAI-ressourcen, Azure AI Search og Storage-kontoen, som demoen bruger. De konkrete rolletitler kan variere, men den aktive bruger skal kunne:
+
+- Oprette og bruge realtime/OpenAI-sessionen
+- Læse fra Azure AI Search-indekset
+- Læse/skrive til den Storage-konto, som knowledge-dokumenterne ligger i
+- Få adgang til de konfigurerede Foundry-deployments, som appen bruger
+
+Hvis appen stadig fejler efter at have skiftet til den korrekte tenant og subscription, skal du først verificere den aktuelle principal og de tildelte roller på de relevante ressourcer i `rg-ai103`, før du ændrer kode.

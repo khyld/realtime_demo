@@ -128,21 +128,30 @@ The assignments below are the repeatable source of truth defined in `infra/main.
 
 Container Apps Easy Auth controls end-user access to the web application separately from these Azure RBAC assignments.
 
-### Current demo environment snapshot
+### Required demo environment
 
-Verified on **2026-09-02** in the `dbhackathon-rg` and `dbhackathon` resource groups. This is an operational snapshot and can drift; Azure and `infra/main.bicep` should be checked again after permission or deployment changes.
+For this demo, the expected Azure context is:
 
-The current demo resources do not exactly match the Bicep topology: `dbhackathon-rg` hosts the application in App Service, while the Bicep template provisions Azure Container Apps.
+- Tenant: `1a8f6d42-be1a-4de7-a668-2857bc39ce8a`
+- Subscription: `40bfcd72-ab71-4a15-be1a-be1cff1d2498`
+- Resource group: `rg-ai103`
 
-| Principal | Resource/scope | Observed assignment |
-|---|---|---|
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-openai` | `Cognitive Services OpenAI User` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice-search` | `Search Index Data Reader` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbvoice5174` | `Storage Blob Data Reader` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `dbhackathon-rg` | `Storage Blob Data Reader` (inherited by resources in the group; duplicates the direct Storage reader assignment) |
-| Two user principals, including `khyld@microsoft.com` | `dbvoice5174` | `Storage Blob Data Contributor` |
-| The same two user principals | `dbvoice-search` | `Search Index Data Reader` and `Search Index Data Contributor` |
-| App Service managed identity for `dbvoice-live-demo-5174` | `db-demo-foundry-resource` in `dbhackathon` | `Cognitive Services OpenAI User` |
-| One additional service principal | `db-demo-foundry-resource` in `dbhackathon` | `Reader` |
+The app uses `DefaultAzureCredential`, so the active Azure CLI session must be logged in to the correct tenant and subscription before starting the realtime session. If the wrong tenant or subscription is active, the backend can start but the realtime session creation will fail with the message: `Could not start the realtime session`.
 
-No direct role assignment was observed on the App Service resource itself. The Azure AI Search managed identity exists, but no direct assignment for it was returned in this snapshot.
+```powershell
+az login --tenant 1a8f6d42-be1a-4de7-a668-2857bc39ce8a
+az account set --subscription 40bfcd72-ab71-4a15-be1a-be1cff1d2498
+az account show --output table
+az group show --name rg-ai103 --subscription 40bfcd72-ab71-4a15-be1a-be1cff1d2498 --output table
+```
+
+### RBAC checklist for the demo
+
+Before retrying the app, confirm that the signed-in principal has the required Azure RBAC on the resources in `rg-ai103`, especially the Foundry/OpenAI resource, Azure AI Search, and Storage account used by the demo. The exact assignment names can vary, but the active user must be able to:
+
+- Create and use the realtime/OpenAI session
+- Read from the Azure AI Search index
+- Read/write the storage account used for knowledge documents
+- Access the configured Foundry deployment(s) used by the app
+
+If the app still fails after switching to the correct tenant/subscription, verify the current principal and the role assignments on the target resources in `rg-ai103` before changing code.
